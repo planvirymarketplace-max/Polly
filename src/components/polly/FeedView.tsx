@@ -15,12 +15,12 @@ import { useComment, useHappenings } from "./hooks";
 import { usePolly } from "./store";
 import {
   ChevronDown,
+  ExternalLink,
   Flame,
   Globe,
   MapPin,
   MessageSquare,
   Send,
-  Sparkles,
 } from "lucide-react";
 
 function tierBadge(tier: string) {
@@ -104,8 +104,20 @@ function HappeningCard({ h, index }: { h: HappeningDTO; index: number }) {
 
       <h2 className="mt-2.5 text-[17px] font-semibold leading-snug">{h.title}</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{h.summary}</p>
-      <p className="mt-2 text-xs text-muted-foreground">
-        {h.sourceName} · {formatDistanceToNow(new Date(h.createdAt), { addSuffix: true })}
+      <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span>
+          {h.sourceName} · {formatDistanceToNow(new Date(h.createdAt), { addSuffix: true })}
+        </span>
+        {h.sourceUrl && (
+          <a
+            href={h.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            Read at {h.sourceName} <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </p>
 
       <Collapsible open={open} onOpenChange={setOpen} className="mt-1">
@@ -165,9 +177,6 @@ export function FeedView() {
             What's happening where it matters — comment, and the system learns what you care about.
           </p>
         </div>
-        <Badge variant="secondary" className="gap-1 whitespace-nowrap text-[10px]">
-          <Sparkles className="h-3 w-3" /> demo feed
-        </Badge>
       </div>
 
       {topics.length > 0 && (
@@ -209,7 +218,9 @@ export function FeedView() {
         ))}
         {!isLoading && filtered.length === 0 && (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            Nothing in this topic yet.
+            {topic
+              ? "Nothing in this topic yet."
+              : "No happenings yet — check back after the next news ingest."}
           </p>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { resolveUser } from "@/lib/polly/session";
+import { resolveActingUser } from "@/lib/polly/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +11,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = (await req.json()) as { body?: string; uid?: string };
+  let body: { body?: string };
+  try {
+    body = (await req.json()) as { body?: string };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const text = (body.body ?? "").trim();
   if (!text) return NextResponse.json({ error: "Say something first" }, { status: 400 });
   if (text.length > 500) return NextResponse.json({ error: "Keep it under 500 characters" }, { status: 400 });
 
-  const user = await resolveUser(body.uid ?? null);
+  // Identity comes only from the JWT (member) or the device-guest
+  // cookie — never from a client-supplied id in the body.
+  const user = await resolveActingUser(req);
   if (!user) return NextResponse.json({ error: "No session" }, { status: 401 });
 
   const happening = await db.happening.findUnique({ where: { id }, include: { topic: true } });

@@ -80,6 +80,8 @@ export interface HappeningDTO {
   title: string;
   summary: string;
   sourceName: string;
+  /** Canonical article URL (decoded from the stored `Source:` prefix — see rss.ts). Null for rows without one. */
+  sourceUrl: string | null;
   metro: string | null;
   stateCode: string | null;
   hotness: number;
