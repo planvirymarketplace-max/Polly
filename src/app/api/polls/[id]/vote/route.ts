@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { resolveUser } from "@/lib/polly/session";
+import { createGuestUser, resolveActingUser, setGuestCookie } from "@/lib/polly/session";
 import { computeWeights, quotaCellFor, weightedResults } from "@/lib/polly/sampling";
 import { awardForResponse } from "@/lib/polly/rewards";
 import type { VoteResultDTO } from "@/lib/polly/types";
@@ -10,16 +10,24 @@ export const dynamic = "force-dynamic";
 // Vote on a poll: records the response in its quota cell, re-runs
 // post-stratification weighting across the full sample, awards
 // tiered rewards, and returns weighted live results.
+// Identity: Supabase JWT (member) or device-guest cookie. No `uid` in
+// the body — an anonymous caller is given a fresh device guest (row +
+// httpOnly `polly_guest` cookie) so guest points stay held until signup.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = (await req.json()) as { optionId?: string; uid?: string };
+  const body = (await req.json()) as { optionId?: string };
   if (!body.optionId) return NextResponse.json({ error: "Pick an option" }, { status: 400 });
 
-  const user = await resolveUser(body.uid ?? null);
-  if (!user) return NextResponse.json({ error: "No session" }, { status: 401 });
+  let user = await resolveActingUser(req);
+  let guestToken: string | null = null;
+  if (!user) {
+    const created = await createGuestUser();
+    user = created.user;
+    guestToken = created.token;
+  }
 
   const poll = await db.poll.findUnique({
     where: { id },
@@ -128,5 +136,7 @@ export async function POST(
       ? `${award.awardedPoints} points earned and held — create an account to claim them, plus sweepstakes entries and revenue share.`
       : null,
   };
-  return NextResponse.json(dto);
+  const res = NextResponse.json(dto);
+  if (guestToken) setGuestCookie(res, guestToken);
+  return res;
 }

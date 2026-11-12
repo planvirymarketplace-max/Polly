@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -15,6 +16,10 @@ datasource db {
 
 model User {
   id                 String              @id @default(cuid())
+  supabaseId         String?             @unique // auth.users id from Supabase Auth (JWT sub); null for device guests
+  email              String?             @unique
+  guestToken         String?             @unique // device guest token (server-set httpOnly cookie); null for members
+  claimedAt          DateTime?           // guest row whose held rewards were claimed by a member (see /api/auth/claim-guest)
   handle             String              @unique
   displayName        String
   accountType        String              @default("MEMBER") // MEMBER | GUEST
@@ -36,6 +41,7 @@ model User {
   responses          PollResponse[]
   transactions       RewardTransaction[]
   interests          UserInterest[]
+  @@map("users")
 }
 
 model Topic {
@@ -46,6 +52,7 @@ model Topic {
   happenings Happening[]
   polls      Poll[]
   users      UserInterest[]
+  @@map("topics")
 }
 
 model UserInterest {
@@ -56,6 +63,7 @@ model UserInterest {
   topic   Topic @relation(fields: [topicId], references: [id])
 
   @@id([userId, topicId])
+  @@map("user_interests")
 }
 
 // A local or national geo-political happening powering the feed.
@@ -72,6 +80,7 @@ model Happening {
   createdAt    DateTime  @default(now())
   topic        Topic?    @relation(fields: [topicId], references: [id])
   comments     Comment[]
+  @@map("happenings")
 }
 
 model Comment {
@@ -83,14 +92,17 @@ model Comment {
   createdAt   DateTime  @default(now())
   user        User      @relation(fields: [userId], references: [id])
   happening   Happening @relation(fields: [happeningId], references: [id], onDelete: Cascade)
+  @@map("comments")
 }
 
 model Sponsor {
-  id      String @id @default(cuid())
-  name    String
+  id               String @id @default(cuid())
+  ownerSupabaseId  String? // Supabase auth.users id of the sponsor account that owns this sponsor
+  name             String
   kind    String // STATION | NONPROFIT | RESEARCH | BRAND | ADVOCACY
   blurb   String?
   polls   Poll[]
+  @@map("sponsors")
 }
 
 model Poll {
@@ -112,6 +124,7 @@ model Poll {
   topic                Topic?   @relation(fields: [topicId], references: [id])
   options              PollOption[]
   responses            PollResponse[]
+  @@map("polls")
 }
 
 model PollOption {
@@ -121,6 +134,7 @@ model PollOption {
   position  Int
   poll      Poll           @relation(fields: [pollId], references: [id], onDelete: Cascade)
   responses PollResponse[]
+  @@map("poll_options")
 }
 
 model PollResponse {
@@ -137,6 +151,7 @@ model PollResponse {
   user          User       @relation(fields: [userId], references: [id])
 
   @@unique([pollId, userId])
+  @@map("poll_responses")
 }
 
 model RewardTransaction {
@@ -148,4 +163,5 @@ model RewardTransaction {
   pollId    String?
   createdAt DateTime @default(now())
   user      User @relation(fields: [userId], references: [id])
+  @@map("reward_transactions")
 }

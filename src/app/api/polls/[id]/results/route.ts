@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 
 // Weighted results for one poll — raw vs census-weighted percentages
 // plus quota fill, the methodology that makes results publishable.
+// Public by design: aggregate results carry no identity, so this route
+// takes no JWT and no `uid`. (Per-response identity stays in the vote
+// route, which enforces one response per user per poll.)
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

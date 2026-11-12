@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { resolveUser } from "@/lib/polly/session";
+import { resolveActingUser } from "@/lib/polly/session";
 import { nextTierFor, tierFor } from "@/lib/polly/rewards";
 import type { WalletDTO } from "@/lib/polly/types";
 
 export const dynamic = "force-dynamic";
 
+// Wallet: points / held guest points / sweepstakes / rev share / tier.
+// Identity: Supabase JWT (member) or device-guest cookie. No `uid` param.
 export async function GET(req: NextRequest) {
-  const uid = req.nextUrl.searchParams.get("uid");
-  const user = await resolveUser(uid);
+  const user = await resolveActingUser(req);
   if (!user) return NextResponse.json({ error: "No session" }, { status: 401 });
 
   const txs = await db.rewardTransaction.findMany({
