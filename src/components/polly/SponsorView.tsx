@@ -237,7 +237,7 @@ function Composer() {
         <Label>Sampling engine</Label>
         <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
           {MODES.map((m) => {
-            const icon = MODE_ICONS[m];
+            const Icon = MODE_ICONS[m];
             const active = mode === m;
             return (
               <button
@@ -250,7 +250,7 @@ function Composer() {
               >
                 <p className="flex items-center justify-between text-sm font-semibold">
                   <span className="flex items-center gap-1.5">
-                    <icon className="h-4 w-4 text-primary" /> {MODE_META[m].label}
+                    <Icon className="h-4 w-4 text-primary" /> {MODE_META[m].label}
                   </span>
                   <span className="text-xs font-bold text-primary">
                     ${MODE_META[m].perCompleteCents / 100}
