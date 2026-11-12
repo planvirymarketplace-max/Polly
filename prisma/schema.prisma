@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// POLLY — social network for information & galvanizing around ideas
+// Monetization: sponsors buy polls against the audience.
+// Schema maps 1:1 to Supabase Postgres for production migration.
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id                 String              @id @default(cuid())
+  handle             String              @unique
+  displayName        String
+  accountType        String              @default("MEMBER") // MEMBER | GUEST
+  metro              String? // primary metro area
+  stateCode          String?
+  ageBracket         String? // 18-24 | 25-34 | 35-44 | 45-54 | 55-64 | 65+
+  genderBucket       String? // F | M | NB | O
+  points             Int                 @default(0)
+  unclaimedPoints    Int                 @default(0) // earned as guest, claimable after signup
+  sweepstakesEntries Int                 @default(0)
+  revShareCents      Int                 @default(0)
+  tier               String              @default("HATCHLING") // HATCHLING | VOICED | WEATHERED | FLOCK_LEADER
+  followerCount      Int                 @default(0)
+  pollsAnswered      Int                 @default(0)
+  commentsPosted     Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  comments           Comment[]
+  responses          PollResponse[]
+  transactions       RewardTransaction[]
+  interests          UserInterest[]
+}
+
+model Topic {
+  id      String         @id @default(cuid())
+  slug    String         @unique
+  label   String
+  emoji   String?
+  happenings Happening[]
+  polls      Poll[]
+  users      UserInterest[]
+}
+
+model UserInterest {
+  userId  String
+  topicId String
+  affinity Float // 0-1 strength inferred from UGC engagement
+  user    User  @relation(fields: [userId], references: [id])
+  topic   Topic @relation(fields: [topicId], references: [id])
+
+  @@id([userId, topicId])
+}
+
+// A local or national geo-political happening powering the feed.
+model Happening {
+  id           String    @id @default(cuid())
+  title        String
+  summary      String
+  sourceName   String // wire service (demo: fictional desks)
+  metro        String? // null = national
+  stateCode    String?
+  hotness      Int       @default(0) // engagement heat score
+  commentCount Int       @default(0)
+  topicId      String?
+  createdAt    DateTime  @default(now())
+  topic        Topic?    @relation(fields: [topicId], references: [id])
+  comments     Comment[]
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  body        String
+  userId      String
+  happeningId String
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id])
+  happening   Happening @relation(fields: [happeningId], references: [id], onDelete: Cascade)
+}
+
+model Sponsor {
+  id      String @id @default(cuid())
+  name    String
+  kind    String // STATION | NONPROFIT | RESEARCH | BRAND | ADVOCACY
+  blurb   String?
+  polls   Poll[]
+}
+
+model Poll {
+  id                   String   @id @default(cuid())
+  sponsorId            String
+  question             String
+  context              String? // why the sponsor is asking
+  topicId              String?
+  kind                 String   @default("SINGLE_CHOICE") // SINGLE_CHOICE | LIKERT
+  samplingMode         String // QUOTA_UGC | UGC_MATCH | RANDOM | SPONSOR_SEGMENT
+  targetMetros         String   @default("NATIONAL") // JSON array or "NATIONAL"
+  rewardPoints         Int      @default(50)
+  estimatedN           Int      @default(500)
+  pricePerCompleteCents Int    @default(120)
+  status               String   @default("LIVE") // LIVE | CLOSED | DRAFT
+  closesAt             DateTime
+  createdAt            DateTime @default(now())
+  sponsor              Sponsor  @relation(fields: [sponsorId], references: [id])
+  topic                Topic?   @relation(fields: [topicId], references: [id])
+  options              PollOption[]
+  responses            PollResponse[]
+}
+
+model PollOption {
+  id        String         @id @default(cuid())
+  pollId    String
+  label     String
+  position  Int
+  poll      Poll           @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  responses PollResponse[]
+}
+
+model PollResponse {
+  id            String   @id @default(cuid())
+  pollId        String
+  optionId      String
+  userId        String
+  quotaCell     String? // "25-34|F|Chicago" — cell used for weighting
+  weight        Float    @default(1.0) // post-stratification weight
+  rewardAwarded Int      @default(0)
+  createdAt     DateTime @default(now())
+  poll          Poll       @relation(fields: [pollId], references: [id])
+  option        PollOption @relation(fields: [optionId], references: [id])
+  user          User       @relation(fields: [userId], references: [id])
+
+  @@unique([pollId, userId])
+}
+
+model RewardTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // POINTS | SWEEPSTAKES | REV_SHARE | PERK
+  amount    Int // points, entries, or cents
+  memo      String
+  pollId    String?
+  createdAt DateTime @default(now())
+  user      User @relation(fields: [userId], references: [id])
+}

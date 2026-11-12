@@ -1,0 +1,14 @@
+{
+  "name": "@polly/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Polly shared domain logic: sampling engine, tiered rewards, pricing, types. Imported by apps/web and apps/mobile.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

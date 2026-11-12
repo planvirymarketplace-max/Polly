@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Polly",
+    "slug": "polly",
+    "version": "0.1.0",
+    "scheme": "polly",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#fbf6ee"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.polly.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Polly uses your location to show local happenings and match you to local polls."
+      }
+    },
+    "android": {
+      "package": "app.polly.mobile",
+      "permissions": ["ACCESS_COARSE_LOCATION"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "extra": {
+      "apiUrl": "http://localhost:3000"
+    }
+  }
+}
