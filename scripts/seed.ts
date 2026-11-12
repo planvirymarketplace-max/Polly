@@ -22,6 +22,7 @@ const ago = (d: number) => new Date(now - d * DAYS);
 
 async function main() {
   console.log("Clearing existing data...");
+  await db.follow.deleteMany();
   await db.rewardTransaction.deleteMany();
   await db.pollResponse.deleteMany();
   await db.pollOption.deleteMany();
@@ -73,6 +74,28 @@ async function main() {
     },
   });
 
+  // Creator channel owner — CREATOR sampling mode delivers polls
+  // through accounts like this one to their follower graph.
+  const rio = await db.user.create({
+    data: {
+      handle: "rio",
+      displayName: "Rio Marlow",
+      accountType: "MEMBER",
+      isCreator: true,
+      metro: "Chicago",
+      stateCode: "IL",
+      ageBracket: "35-44",
+      genderBucket: "M",
+      points: 15200,
+      sweepstakesEntries: 40,
+      revShareCents: 21400,
+      tier: "FLOCK_LEADER",
+      followerCount: 4820,
+      pollsAnswered: 31,
+      commentsPosted: 112,
+    },
+  });
+
   // Guest identity for limited guest mode.
   await db.user.create({
     data: {
@@ -118,6 +141,29 @@ async function main() {
     });
     pool.push({ id: u.id, age: u.ageBracket!, gender: u.genderBucket!, metro: u.metro! });
   }
+
+  console.log("Seeding the follow graph (creator audience)...");
+  // maya + most neighbors follow rio; columbusjoe and desertdawn do not,
+  // so the non-follower "extended audience" explanation branch is demoable.
+  const rioFollowerHandles = [
+    "maya",
+    "danielk",
+    "priya_reads",
+    "windycityted",
+    "angela_oakpark",
+    "motorcitymara",
+    "clevlandray",
+  ];
+  const followPairs: [string, string][] = rioFollowerHandles.map((h) =>
+    h === "maya" ? [maya.id, rio.id] : [neighbors[h], rio.id]
+  );
+  // Half the synthetic pool follows rio too — the audience behind the numbers.
+  for (let i = 0; i < pool.length; i += 2) {
+    followPairs.push([pool[i].id, rio.id]);
+  }
+  await db.follow.createMany({
+    data: followPairs.map(([followerId, followeeId]) => ({ followerId, followeeId })),
+  });
 
   console.log("Seeding interests...");
   const mayaInterests: [string, number][] = [
@@ -337,6 +383,9 @@ async function main() {
     capitol: await db.sponsor.create({
       data: { name: "Capitol Insight Group", kind: "ADVOCACY", blurb: "Cross-ideological policy research" },
     }),
+    marlow: await db.sponsor.create({
+      data: { name: "The Marlow Memo", kind: "CREATOR", blurb: "Rio Marlow's civic-explainer channel — 4.8k followers" },
+    }),
   };
 
   async function makePoll(p: {
@@ -345,6 +394,7 @@ async function main() {
     context: string;
     topicSlug: string;
     samplingMode: string;
+    creatorId?: string;
     targetMetros?: string[];
     rewardPoints: number;
     estimatedN: number;
@@ -360,6 +410,7 @@ async function main() {
         context: p.context,
         topicId: topics[p.topicSlug].id,
         samplingMode: p.samplingMode,
+        creatorId: p.creatorId ?? null,
         targetMetros: p.targetMetros ? JSON.stringify(p.targetMetros) : "NATIONAL",
         rewardPoints: p.rewardPoints,
         estimatedN: p.estimatedN,
@@ -467,6 +518,25 @@ async function main() {
     options: ["1 — No trust at all", "2", "3 — Neutral", "4", "5 — Complete trust"],
   });
 
+  // 7. CREATOR — the poll runs through a creator channel to its followers.
+  // Station × creator collab: Meridian buys Rio Marlow's audience; Rio
+  // takes rev share on every complete. Followers see it first-hand.
+  const creatorPoll = await makePoll({
+    sponsorId: sponsors.meridian.id,
+    question: "Should the city fast-track community land trusts to develop its vacant lots?",
+    context:
+      "From tonight's Marlow Memo with Meridian: the lot-by-lot map of city-owned vacancies, and what happened where land trusts got there first. Results read on air.",
+    topicSlug: "housing",
+    samplingMode: "CREATOR",
+    creatorId: rio.id,
+    targetMetros: ["Chicago"],
+    rewardPoints: 65,
+    estimatedN: 600,
+    pricePerCompleteCents: 300,
+    closesInDays: 7,
+    options: ["Yes — land trusts get first claim", "Only with a mixed-income requirement", "No — sell to the highest bidder", "Case-by-case, too early to commit"],
+  });
+
   console.log("Seeding poll responses...");
   async function seedResponses(
     pollId: string,
@@ -534,6 +604,16 @@ async function main() {
     [2.5, 2.9, 1.5, 1.1],
   );
 
+  const creatorOptions = await db.pollOption.findMany({
+    where: { pollId: creatorPoll.id },
+    orderBy: { position: "asc" },
+  });
+  await seedResponses(
+    creatorPoll.id,
+    creatorOptions.map((o) => o.id),
+    [2.8, 2.4, 1.1, 1.9],
+  );
+
   console.log("Seeding wallet history...");
   const txDefs = [
     { kind: "POINTS", amount: 94, memo: "Completed: Post-midterm priorities (Capitol Insight Group)", daysAgo: 2 },
@@ -559,6 +639,7 @@ async function main() {
 
   const counts = {
     users: await db.user.count(),
+    follows: await db.follow.count(),
     happenings: await db.happening.count(),
     comments: await db.comment.count(),
     sponsors: await db.sponsor.count(),

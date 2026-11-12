@@ -26,7 +26,7 @@ polly/
 │   └── lib/polly/          # core engines (mirrored to packages/core)
 ├── packages/core/          # @polly/core — shared domain logic for web + mobile
 │   └── src/
-│       ├── sampling.ts     # the business: 4 selection modes + post-stratification weighting
+│       ├── sampling.ts     # the business: 5 selection modes + post-stratification weighting
 │       ├── rewards.ts      # tiered rewards: points, sweepstakes, rev share, perks
 │       ├── pricing.ts      # sponsor price estimator vs traditional polling
 │       └── types.ts        # DTOs shared across platforms
@@ -72,6 +72,7 @@ Set `extra.apiUrl` in `app.json` to your deployed web app (Lightsail host or tun
 | **UGC Match** | Pure topical match. Fast, passionate, skews loud — for engagement reads, not front-page numbers. | $1.00 |
 | **Random Draw** | Uniform probability. Methodological benchmark, zero targeting. | $1.20 |
 | **Sponsor Segment** | Sponsor defines geography × topic × demographics. Polly fills the order. | $2.25 |
+| **Creator Audience** | The poll runs through a creator's channel to their followers — highest completion rates in the app. The creator takes revenue share on every complete. | $3.00 |
 
 Weighting: each response carries `weight = census_target_share / sample_share` (rim-capped
 0.25–4.0). Raw vs weighted percentages are shown side-by-side everywhere — users see the
@@ -98,7 +99,7 @@ Guests accrue **held** points — claimable the moment they create an account.
 The Prisma schema maps directly to Postgres:
 
 1. Create a Supabase project; run the SQL equivalent of `prisma/schema.prisma`
-   (tables: `User`, `Topic`, `UserInterest`, `Happening`, `Comment`, `Sponsor`,
+   (tables: `User`, `Topic`, `UserInterest`, `Follow`, `Happening`, `Comment`, `Sponsor`,
    `Poll`, `PollOption`, `PollResponse`, `RewardTransaction`).
 2. Auth: enable Apple, Google, phone OTP (Twilio via Supabase), magic link —
    the auth screen already presents all of them; replace the demo session
@@ -134,6 +135,7 @@ Google accounts need the 14-day closed-test window before production.
 
 Demo build, seeded with fictional wire services and sponsors by design — no real
 data, no real money. What works end-to-end today: auth flow (all methods), the
-feed with commentary, all four sampling modes, voting with live post-stratification
-weighting, quota fill visualization, tiered rewards with guest held-points, and a
-sponsor dashboard that launches polls into the live member app instantly.
+feed with commentary, all five sampling modes (including creator-channel polls
+with follower-graph targeting), voting with live post-stratification weighting,
+quota fill visualization, tiered rewards with guest held-points, and a sponsor
+dashboard that launches polls into the live member app instantly.

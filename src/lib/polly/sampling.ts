@@ -1,11 +1,14 @@
 // ─────────────────────────────────────────────────────────────
 // POLLY CORE — Sampling engine.
-// The business. Four selection modes:
+// The business. Five selection modes:
 //   QUOTA_UGC      invite by UGC interest, cap by demographic
 //                  quota cells, weight results to census targets
 //   UGC_MATCH      pure topical matching against the interest graph
 //   RANDOM         uniform draw from opted-in users
 //   SPONSOR_SEGMENT sponsor-chosen geography × topic × demo segment
+//   CREATOR        poll delivered through a creator's channel to
+//                  their followers — highest attention; creators
+//                  take revenue share on every complete
 // Produces transparent "why you?" explanations — Polly never
 // selects in the dark.
 // ─────────────────────────────────────────────────────────────
@@ -54,6 +57,11 @@ export const MODE_META: Record<
     blurb: "You define the slice: metros, topics, demographics. Polly fills the order.",
     perCompleteCents: 225,
   },
+  CREATOR: {
+    label: "Creator Audience",
+    blurb: "Runs through a creator's channel to their followers — the highest completion rates in the app, and the creator takes rev share on every complete.",
+    perCompleteCents: 300,
+  },
 };
 
 export function quotaCellFor(user: {
@@ -81,11 +89,15 @@ export function explainSelection(
     ageBracket: string | null;
     genderBucket: string | null;
     interests: InterestLike[];
+    // CREATOR mode: handles this user follows (from the Follow graph)
+    follows?: string[];
   },
   poll: {
     samplingMode: SamplingMode;
     targetMetros: string;
     topic: { slug: string; label: string; emoji: string | null } | null;
+    // CREATOR mode: the channel delivering the poll
+    creator?: { handle: string; displayName: string } | null;
   }
 ): SelectionExplanation {
   const metros: string[] =
@@ -170,6 +182,28 @@ export function explainSelection(
             : "Sponsor-defined segment.",
           "Sponsors choose who they hear from; Polly verifies the fill.",
         ],
+      };
+    }
+    case "CREATOR": {
+      const handle = poll.creator?.handle ? `@${poll.creator.handle}` : "the creator";
+      const reasons: string[] = [];
+      if (poll.creator && user.follows?.includes(poll.creator.handle)) {
+        reasons.push(`You follow ${handle} — this poll came through their channel.`);
+      } else if (matchedTopic && poll.topic) {
+        reasons.push(
+          `You're in ${handle}'s extended audience via your ${poll.topic.label} engagement.`
+        );
+      } else {
+        reasons.push(`This poll runs through ${handle}'s channel.`);
+      }
+      reasons.push(
+        "Creator channels earn revenue share on every completed response — sponsors buy the attention, the audience shares in it."
+      );
+      if (geoMatch && metros.length > 0) reasons.push(`Scoped to ${metros.join(", ")}.`);
+      return {
+        mode: "CREATOR",
+        headline: "Delivered through a creator's channel",
+        reasons,
       };
     }
   }

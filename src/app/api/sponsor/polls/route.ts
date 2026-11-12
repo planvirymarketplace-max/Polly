@@ -10,7 +10,8 @@ const createSchema = z.object({
   question: z.string().min(8).max(200),
   context: z.string().max(300).optional().default(""),
   topicId: z.string().min(1),
-  samplingMode: z.enum(["QUOTA_UGC", "UGC_MATCH", "RANDOM", "SPONSOR_SEGMENT"]),
+  samplingMode: z.enum(["QUOTA_UGC", "UGC_MATCH", "RANDOM", "SPONSOR_SEGMENT", "CREATOR"]),
+  creatorId: z.string().optional(), // required when samplingMode = CREATOR
   targetMetros: z.array(z.string()).default([]),
   rewardPoints: z.number().int().min(20).max(500).default(50),
   estimatedN: z.number().int().min(100).max(5000).default(500),
@@ -24,6 +25,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       sponsor: true,
+      creator: { select: { handle: true, displayName: true } },
       topic: true,
       options: { orderBy: { position: "asc" } },
       responses: true,
@@ -45,6 +47,7 @@ export async function GET() {
       topic: p.topic ? { label: p.topic.label, emoji: p.topic.emoji } : null,
       samplingMode: p.samplingMode,
       modeLabel: MODE_META[p.samplingMode as keyof typeof MODE_META].label,
+      creatorHandle: p.creator ? p.creator.handle : null,
       status: p.status,
       estimatedN: p.estimatedN,
       actualN: p.responses.length,
@@ -74,6 +77,22 @@ export async function POST(req: NextRequest) {
   const sponsor = await db.sponsor.findUnique({ where: { id: d.sponsorId } });
   if (!sponsor) return NextResponse.json({ error: "Unknown sponsor" }, { status: 404 });
 
+  // CREATOR mode: validate the channel and stamp it on the poll.
+  let creatorId: string | null = null;
+  if (d.samplingMode === "CREATOR") {
+    if (!d.creatorId) {
+      return NextResponse.json(
+        { error: "Creator Audience mode requires a creator channel" },
+        { status: 400 }
+      );
+    }
+    const creator = await db.user.findUnique({ where: { id: d.creatorId } });
+    if (!creator || !creator.isCreator) {
+      return NextResponse.json({ error: "Unknown creator channel" }, { status: 404 });
+    }
+    creatorId = creator.id;
+  }
+
   const perComplete = MODE_META[d.samplingMode].perCompleteCents;
   const poll = await db.poll.create({
     data: {
@@ -82,6 +101,7 @@ export async function POST(req: NextRequest) {
       context: d.context,
       topicId: d.topicId,
       samplingMode: d.samplingMode,
+      creatorId,
       targetMetros: d.targetMetros.length > 0 ? JSON.stringify(d.targetMetros) : "NATIONAL",
       rewardPoints: d.rewardPoints,
       estimatedN: d.estimatedN,

@@ -37,6 +37,7 @@ import {
   FlaskConical,
   HeartHandshake,
   Landmark,
+  Mic,
   Plus,
   Rocket,
   Scale,
@@ -61,12 +62,13 @@ const METROS = [
   "Seattle",
 ];
 
-const MODES: SamplingMode[] = ["QUOTA_UGC", "UGC_MATCH", "RANDOM", "SPONSOR_SEGMENT"];
+const MODES: SamplingMode[] = ["QUOTA_UGC", "UGC_MATCH", "RANDOM", "SPONSOR_SEGMENT", "CREATOR"];
 const MODE_ICONS: Record<SamplingMode, typeof Target> = {
   QUOTA_UGC: Scale,
   UGC_MATCH: Target,
   RANDOM: Users,
   SPONSOR_SEGMENT: Landmark,
+  CREATOR: Mic,
 };
 
 function money(cents: number) {
@@ -105,6 +107,7 @@ function Composer() {
   });
 
   const [sponsorId, setSponsorId] = useState<string>("");
+  const [creatorId, setCreatorId] = useState<string>("");
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState("");
   const [topicId, setTopicId] = useState<string>("");
@@ -140,6 +143,14 @@ function Composer() {
       });
       return;
     }
+    if (mode === "CREATOR" && !creatorId) {
+      toast({
+        title: "Pick a creator channel",
+        description: "Creator Audience polls run through a specific creator — choose who delivers it.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await create.mutateAsync({
         sponsorId,
@@ -147,6 +158,7 @@ function Composer() {
         context: context.trim(),
         topicId,
         samplingMode: mode,
+        creatorId: mode === "CREATOR" ? creatorId : undefined,
         targetMetros: metros,
         rewardPoints,
         estimatedN,
@@ -160,6 +172,7 @@ function Composer() {
       setQuestion("");
       setContext("");
       setOptions(["", ""]);
+      setCreatorId("");
     } catch (e) {
       toast({
         title: "Launch failed",
@@ -264,6 +277,36 @@ function Composer() {
           })}
         </div>
       </div>
+
+      {/* creator channel — CREATOR mode only */}
+      {mode === "CREATOR" && (
+        <div className="mt-4 space-y-1.5 rounded-2xl border border-primary/25 bg-accent/50 p-3.5">
+          <Label htmlFor="sp-creator">Creator channel</Label>
+          <Select value={creatorId} onValueChange={setCreatorId}>
+            <SelectTrigger id="sp-creator" className="w-full bg-card">
+              <SelectValue placeholder="Who delivers this to their audience?" />
+            </SelectTrigger>
+            <SelectContent>
+              {(
+                (meta?.creators ?? []) as {
+                  id: string;
+                  handle: string;
+                  displayName: string;
+                  followerCount: number;
+                }[]
+              ).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  @{c.handle} · {c.displayName} · {c.followerCount.toLocaleString()} followers
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            The poll lands in every follower's feed under the creator's name with a transparent
+            "delivered through" note — and the creator earns revenue share on each complete.
+          </p>
+        </div>
+      )}
 
       {/* geography */}
       <div className="mt-4">
@@ -428,6 +471,11 @@ function SponsorPollItem({ p }: { p: SponsorPollRow }) {
         <Badge variant="outline" className="gap-1">
           {MODE_META[p.samplingMode as SamplingMode].label}
         </Badge>
+        {p.creatorHandle && (
+          <Badge variant="outline" className="gap-1">
+            <Mic className="h-3 w-3" /> via @{p.creatorHandle}
+          </Badge>
+        )}
         <Badge
           variant={p.status === "LIVE" ? "default" : "secondary"}
           className={

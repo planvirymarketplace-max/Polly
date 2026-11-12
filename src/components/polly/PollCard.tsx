@@ -18,6 +18,7 @@ import {
   FlaskConical,
   HeartHandshake,
   Landmark,
+  Mic,
   Scale,
   ShoppingCart,
   Target,
@@ -34,6 +35,7 @@ const SPONSOR_ICONS: Record<string, typeof Tv> = {
   RESEARCH: FlaskConical,
   BRAND: ShoppingCart,
   ADVOCACY: Landmark,
+  CREATOR: Mic,
 };
 
 const MODE_ICONS: Record<string, typeof Target> = {
@@ -41,6 +43,7 @@ const MODE_ICONS: Record<string, typeof Target> = {
   UGC_MATCH: Target,
   RANDOM: Users,
   SPONSOR_SEGMENT: Landmark,
+  CREATOR: Mic,
 };
 
 function QuotaBars({ results }: { results: PollResults }) {
@@ -226,7 +229,8 @@ export function PollCard({ poll, index }: { poll: PollCardDTO; index: number }) 
           <div>
             <p className="text-sm font-semibold leading-tight">{poll.sponsor.name}</p>
             <p className="text-[11px] text-muted-foreground">
-              Sponsored poll · closes {formatDistanceToNow(new Date(poll.closesAt), { addSuffix: true })}
+              {poll.creator ? `via @${poll.creator.handle} · ` : ""}Sponsored poll · closes{" "}
+              {formatDistanceToNow(new Date(poll.closesAt), { addSuffix: true })}
             </p>
           </div>
         </div>

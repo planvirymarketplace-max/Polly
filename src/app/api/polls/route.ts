@@ -18,11 +18,19 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: {
       sponsor: true,
+      creator: { select: { handle: true, displayName: true } },
       topic: true,
       options: { orderBy: { position: "asc" } },
       responses: { where: { userId: user.id } },
     },
   });
+
+  // Follow graph — the CREATOR mode audience check.
+  const follows = await db.follow.findMany({
+    where: { followerId: user.id },
+    include: { followee: { select: { handle: true } } },
+  });
+  const followedHandles = follows.map((f) => f.followee.handle);
 
   const cards: PollCardDTO[] = [];
   for (const p of polls) {
@@ -39,17 +47,24 @@ export async function GET(req: NextRequest) {
       closesAt: p.closesAt.toISOString(),
       estimatedN: p.estimatedN,
       sponsor: { name: p.sponsor.name, kind: p.sponsor.kind },
+      creator: p.creator ? { handle: p.creator.handle, displayName: p.creator.displayName } : null,
       topic: topicDTO(p.topic),
       options: p.options.map((o) => ({ id: o.id, label: o.label })),
       alreadyResponded: answered,
       myOptionId: mine?.optionId,
       explanation:
         p.status === "LIVE" && !answered
-          ? explainSelection(user, {
-              samplingMode: p.samplingMode as SamplingMode,
-              targetMetros: p.targetMetros,
-              topic: p.topic ? topicDTO(p.topic) : null,
-            })
+          ? explainSelection(
+              { ...user, follows: followedHandles },
+              {
+                samplingMode: p.samplingMode as SamplingMode,
+                targetMetros: p.targetMetros,
+                topic: p.topic ? topicDTO(p.topic) : null,
+                creator: p.creator
+                  ? { handle: p.creator.handle, displayName: p.creator.displayName }
+                  : null,
+              }
+            )
           : null,
     };
     cards.push(card);
