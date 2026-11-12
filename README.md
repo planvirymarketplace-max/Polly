@@ -48,9 +48,11 @@ files are byte-identical to `packages/core/src/*` today, so the switch is mechan
 
 ```bash
 bun install
-bun run db:push        # create SQLite schema
-bun scripts/seed.ts    # demo data: feed, sponsors, polls, 520 seeded responses
-bun run dev            # http://localhost:3000
+bun run db:generate     # required — build does not generate the Prisma client
+bun run db:push         # create the Supabase Postgres schema (needs real DATABASE_URL/DIRECT_URL)
+bun scripts/seed.ts     # reference data only: the 9-topic taxonomy
+bun scripts/ingest-rss.ts  # real happenings from verified public RSS feeds
+bun run dev             # http://localhost:3000
 ```
 
 ### Mobile (apps/mobile)
@@ -132,8 +134,20 @@ Google accounts need the 14-day closed-test window before production.
 
 ## Status
 
-Demo build, seeded with fictional wire services and sponsors by design — no real
-data, no real money. What works end-to-end today: auth flow (all methods), the
-feed with commentary, all four sampling modes, voting with live post-stratification
-weighting, quota fill visualization, tiered rewards with guest held-points, and a
-sponsor dashboard that launches polls into the live member app instantly.
+MVP build on branch `mvp-deploy` (see `MVP_HANDOVER.md`): Supabase Auth + Postgres
+via Prisma, real RSS ingestion (no fictional seed — `scripts/seed.ts` seeds only
+the 9-topic taxonomy), sponsor-only polls with all four sampling modes, voting
+with live post-stratification weighting, quota fill visualization, tiered
+rewards with guest held-points + claim on signup, and a sponsor dashboard that
+launches polls into the live member app instantly. **Not yet deployed** — it
+needs a Supabase project and Lightsail access (blockers listed in
+`MVP_HANDOVER.md` §8).
+
+## Deploy (MVP)
+
+```bash
+cp .env.example .env.production   # fill in real Supabase values
+./lightsail/deploy.sh             # builds, pushes, deploys to Lightsail
+```
+
+Full steps, env vars, and the Friday smoke test: `lightsail/ENV_CHECKLIST.md`.

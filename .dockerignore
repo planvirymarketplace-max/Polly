@@ -1,0 +1,22 @@
+# Build context for the Polly web image. Keep secrets and build outputs
+# out of the image (and out of `docker build` uploads).
+node_modules
+.next
+.git
+.gitignore
+dev.log
+server.log
+*.log
+*.db
+*.db-journal
+.env
+.env.*
+!.env.example
+# Mobile is deployed separately via EAS; it is not part of the web image.
+apps/mobile
+# Local tooling / editor state.
+.turbo
+coverage
+.vscode
+.idea
+.DS_Store
