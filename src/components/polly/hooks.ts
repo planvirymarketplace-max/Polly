@@ -1,7 +1,11 @@
 "use client";
 
 // Data hooks — TanStack Query against the API layer.
-// Production: same hooks, different base URL (Supabase-backed API).
+// Identity is never sent as a query param or body field: every
+// request carries `Authorization: Bearer <Supabase JWT>` via authFetch
+// when a session exists, and the device-guest httpOnly cookie travels
+// automatically on same-origin requests. The `userId` argument is kept
+// only as part of the query key (per-user caching); it is never sent.
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -12,6 +16,7 @@ import type {
   VoteResultDTO,
   WalletDTO,
 } from "@/lib/polly/types";
+import { authFetch } from "@/lib/supabase/browser";
 
 export interface SponsorPollRow {
   id: string;
@@ -32,15 +37,11 @@ export interface SponsorPollRow {
   results: PollResults;
 }
 
-function uidParam(userId: string | null) {
-  return userId ? `?uid=${encodeURIComponent(userId)}` : "";
-}
-
 export function useHappenings() {
   return useQuery<{ happenings: HappeningDTO[] }>({
     queryKey: ["happenings"],
     queryFn: async () => {
-      const res = await fetch("/api/happenings");
+      const res = await authFetch("/api/happenings");
       if (!res.ok) throw new Error("Feed failed to load");
       return res.json();
     },
@@ -57,10 +58,10 @@ export function useComment(userId: string | null) {
       happeningId: string;
       body: string;
     }) => {
-      const res = await fetch(`/api/happenings/${happeningId}/comments`, {
+      const res = await authFetch(`/api/happenings/${happeningId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, uid: userId }),
+        body: JSON.stringify({ body }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Could not post");
       return res.json();
@@ -76,7 +77,7 @@ export function usePolls(userId: string | null) {
   return useQuery<{ live: PollCardDTO[]; closed: PollCardDTO[] }>({
     queryKey: ["polls", userId],
     queryFn: async () => {
-      const res = await fetch(`/api/polls${uidParam(userId)}`);
+      const res = await authFetch("/api/polls");
       if (!res.ok) throw new Error("Polls failed to load");
       return res.json();
     },
@@ -87,10 +88,10 @@ export function useVote(userId: string | null) {
   const qc = useQueryClient();
   return useMutation<VoteResultDTO, Error, { pollId: string; optionId: string }>({
     mutationFn: async ({ pollId, optionId }) => {
-      const res = await fetch(`/api/polls/${pollId}/vote`, {
+      const res = await authFetch(`/api/polls/${pollId}/vote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ optionId, uid: userId }),
+        body: JSON.stringify({ optionId }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "Vote failed");
       return res.json();
@@ -110,7 +111,7 @@ export function usePollResults(pollId: string | null) {
     queryKey: ["pollResults", pollId],
     enabled: Boolean(pollId),
     queryFn: async () => {
-      const res = await fetch(`/api/polls/${pollId}/results`);
+      const res = await authFetch(`/api/polls/${pollId}/results`);
       if (!res.ok) throw new Error("Results failed to load");
       return res.json();
     },
@@ -122,7 +123,7 @@ export function useWallet(userId: string | null) {
     queryKey: ["wallet", userId],
     enabled: Boolean(userId),
     queryFn: async () => {
-      const res = await fetch(`/api/wallet${uidParam(userId)}`);
+      const res = await authFetch("/api/wallet");
       if (!res.ok) throw new Error("Wallet failed to load");
       return res.json();
     },
@@ -134,7 +135,7 @@ export function useProfile(userId: string | null) {
     queryKey: ["profile", userId],
     enabled: Boolean(userId),
     queryFn: async () => {
-      const res = await fetch(`/api/profile${uidParam(userId)}`);
+      const res = await authFetch("/api/profile");
       if (!res.ok) throw new Error("Profile failed to load");
       return res.json();
     },
@@ -145,7 +146,7 @@ export function useSponsorPolls() {
   return useQuery<{ polls: SponsorPollRow[] }>({
     queryKey: ["sponsorPolls"],
     queryFn: async () => {
-      const res = await fetch("/api/sponsor/polls");
+      const res = await authFetch("/api/sponsor/polls");
       if (!res.ok) throw new Error("Sponsor polls failed to load");
       return res.json();
     },
@@ -156,7 +157,7 @@ export function useCreateSponsorPoll() {
   const qc = useQueryClient();
   return useMutation<{ pollId: string; perCompleteCents: number }, Error, Record<string, unknown>>({
     mutationFn: async (payload) => {
-      const res = await fetch("/api/sponsor/polls", {
+      const res = await authFetch("/api/sponsor/polls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -186,7 +187,7 @@ export function useEstimate(params: {
     queryKey: ["estimate", params.completes, params.mode, params.metros],
     enabled: params.enabled,
     queryFn: async () => {
-      const res = await fetch(`/api/sponsor/estimate?${search.toString()}`);
+      const res = await authFetch(`/api/sponsor/estimate?${search.toString()}`);
       if (!res.ok) throw new Error("Estimate failed");
       return res.json();
     },

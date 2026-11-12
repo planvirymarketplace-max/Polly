@@ -13,8 +13,9 @@ const queryClient = new QueryClient({
 });
 
 interface SessionDTO {
-  member: { id: string; handle: string; displayName: string; tier: string; metro: string | null };
-  guest: { id: string; handle: string; displayName: string };
+  authenticated: boolean;
+  member: { id: string; handle: string; displayName: string; tier: string; metro: string | null } | null;
+  guest: { id: string; handle: string; displayName: string } | null;
 }
 
 function PollyRoot() {
@@ -37,7 +38,7 @@ function PollyRoot() {
           <PollyLogo size={56} />
         </span>
         <p className="text-sm text-muted-foreground">
-          Couldn't reach the flock. The demo database may need re-seeding.
+          Couldn&apos;t reach the flock. Check your connection and try again.
         </p>
         <Button onClick={() => session.refetch()}>Try again</Button>
       </div>

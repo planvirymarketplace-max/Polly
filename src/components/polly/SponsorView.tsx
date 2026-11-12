@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
   type SponsorPollRow,
 } from "./hooks";
 import { usePolly } from "./store";
+import { authFetch } from "@/lib/supabase/browser";
 import { PollyLogo } from "./PollyLogo";
 import {
   ArrowLeft,
@@ -69,6 +70,16 @@ const MODE_ICONS: Record<SamplingMode, typeof Target> = {
   SPONSOR_SEGMENT: Landmark,
 };
 
+// Preview of the "Why you were selected" headline each sampled
+// member sees for this mode (the full explanation adds reasons
+// specific to their profile — see explainSelection in sampling.ts).
+const MODE_PREVIEW_HEADLINE: Record<SamplingMode, string> = {
+  QUOTA_UGC: "Selected for you — by interest, balanced by quota",
+  UGC_MATCH: "Matched to your engagement — no quotas applied",
+  RANDOM: "Random draw — everyone had equal odds",
+  SPONSOR_SEGMENT: "You fit the segment the sponsor is buying",
+};
+
 function money(cents: number) {
   return cents >= 100000
     ? `$${(cents / 100000).toFixed(1)}k`
@@ -94,17 +105,90 @@ function ThesisStrip() {
   );
 }
 
+const SPONSOR_KINDS = ["STATION", "NONPROFIT", "RESEARCH", "BRAND", "ADVOCACY"] as const;
+
 function Composer() {
+  const qc = useQueryClient();
+  // Topics are public metadata; sponsors come only from /api/sponsor —
+  // the orgs owned by the signed-in user. The seed data has no sponsors.
   const { data: meta } = useQuery({
     queryKey: ["meta"],
     queryFn: async () => {
-      const res = await fetch("/api/meta");
+      const res = await authFetch("/api/meta");
       if (!res.ok) throw new Error("Meta failed");
       return res.json();
     },
   });
 
+  const {
+    data: mySponsorsData,
+    isLoading: sponsorsLoading,
+    isError: sponsorsError,
+  } = useQuery({
+    queryKey: ["mySponsors"],
+    queryFn: async () => {
+      const res = await authFetch("/api/sponsor");
+      if (!res.ok) throw new Error("Sponsors failed to load");
+      return res.json() as Promise<{
+        sponsors: { id: string; name: string; kind: string; blurb: string | null }[];
+      }>;
+    },
+  });
+  const mySponsors = mySponsorsData?.sponsors ?? [];
+
   const [sponsorId, setSponsorId] = useState<string>("");
+  const [showRegister, setShowRegister] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regKind, setRegKind] = useState<string>("STATION");
+  const [regBlurb, setRegBlurb] = useState("");
+  const { toast } = useToast();
+
+  const register = useMutation({
+    mutationFn: async (payload: { name: string; kind: string; blurb?: string }) => {
+      const res = await authFetch("/api/sponsor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Registration failed");
+      return res.json() as Promise<{ sponsor: { id: string; name: string; kind: string } }>;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["mySponsors"] });
+      qc.invalidateQueries({ queryKey: ["sponsorPolls"] });
+      setSponsorId(data.sponsor.id);
+      setShowRegister(false);
+      setRegName("");
+      setRegBlurb("");
+      toast({
+        title: "Sponsor org registered",
+        description: `${data.sponsor.name} can now launch polls.`,
+      });
+    },
+    onError: (e) => {
+      toast({
+        title: "Registration failed",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const submitRegister = () => {
+    if (!regName.trim()) {
+      toast({
+        title: "Name your org",
+        description: "A sponsor org needs a name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    register.mutate({
+      name: regName.trim(),
+      kind: regKind,
+      blurb: regBlurb.trim() || undefined,
+    });
+  };
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState("");
   const [topicId, setTopicId] = useState<string>("");
@@ -115,7 +199,6 @@ function Composer() {
   const [estimatedN, setEstimatedN] = useState(500);
 
   const create = useCreateSponsorPoll();
-  const { toast } = useToast();
 
   const metrosParam = metros.length === 0 ? "" : metros.join(",");
   const estimate = useEstimate({ completes: estimatedN, mode, metros: metrosParam, enabled: true });
@@ -181,18 +264,82 @@ function Composer() {
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="sp-sponsor">Sponsor</Label>
-          <Select value={sponsorId} onValueChange={setSponsorId}>
+          <Select value={sponsorId} onValueChange={setSponsorId} disabled={sponsorsLoading || mySponsors.length === 0}>
             <SelectTrigger id="sp-sponsor" className="w-full">
-              <SelectValue placeholder="Choose identity" />
+              <SelectValue placeholder={sponsorsLoading ? "Loading your orgs…" : "Choose one of your orgs"} />
             </SelectTrigger>
             <SelectContent>
-              {(meta?.sponsors ?? []).map((s: { id: string; name: string; kind: string }) => (
+              {mySponsors.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.name} · {s.kind.toLowerCase()}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {sponsorsError && (
+            <p className="text-xs text-muted-foreground">
+              Sign in to load your sponsor orgs.
+            </p>
+          )}
+          {!sponsorsLoading && !sponsorsError && mySponsors.length === 0 && !showRegister && (
+            <p className="text-xs text-muted-foreground">
+              No sponsor org registered yet — register one to launch polls.
+            </p>
+          )}
+          {!showRegister ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 px-0 text-muted-foreground"
+              onClick={() => setShowRegister(true)}
+            >
+              <Plus className="h-3.5 w-3.5" /> Register a sponsor org
+            </Button>
+          ) : (
+            <div className="space-y-2 rounded-2xl border border-border/70 bg-accent/40 p-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="sp-reg-name">Org name</Label>
+                <Input
+                  id="sp-reg-name"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  placeholder="e.g. WKYC News, Civic Research Lab"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sp-reg-kind">Kind</Label>
+                <Select value={regKind} onValueChange={setRegKind}>
+                  <SelectTrigger id="sp-reg-kind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SPONSOR_KINDS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {k.charAt(0) + k.slice(1).toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sp-reg-blurb">About (optional)</Label>
+                <Input
+                  id="sp-reg-blurb"
+                  value={regBlurb}
+                  onChange={(e) => setRegBlurb(e.target.value)}
+                  placeholder="What does this org do?"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={submitRegister} disabled={register.isPending}>
+                  {register.isPending ? "Registering…" : "Register org"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowRegister(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="sp-topic">Topic</Label>
@@ -262,6 +409,16 @@ function Composer() {
               </button>
             );
           })}
+        </div>
+        <div className="mt-2 rounded-2xl border border-primary/25 bg-accent/50 p-3">
+          <p className="text-[11px] font-semibold text-accent-foreground">
+            Why you were selected — preview
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Members matched by this mode will see: “{MODE_PREVIEW_HEADLINE[mode]}” — plus the
+            specific reasons for their profile (their interests, quota cell, or segment).
+            Polly never selects in the dark.
+          </p>
         </div>
       </div>
 
@@ -394,7 +551,7 @@ function Composer() {
             </div>
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground">
-            {money(est.perCompleteCents)}/complete · demo figures · quota+UGC results arrive census-weighted with published methodology
+            {money(est.perCompleteCents)}/complete · per-complete rates from the pricing schedule · quota+UGC results arrive census-weighted with published methodology
           </p>
         </div>
       )}
@@ -530,7 +687,6 @@ export function SponsorView() {
             <span className="hidden sm:inline">
               {totalCompletes.toLocaleString()} completes · {money(totalSpend)} lifetime spend
             </span>
-            <Badge variant="secondary">demo console</Badge>
           </div>
         </div>
       </header>

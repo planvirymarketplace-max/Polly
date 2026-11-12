@@ -154,7 +154,7 @@ export function ProfileView() {
               defaultChecked
               aria-label={s.label}
               onCheckedChange={() =>
-                toast({ title: "Demo build", description: "Preferences persist in production." })
+                toast({ title: "Not saved yet", description: "Notification preferences aren't stored yet — this switch is a preview." })
               }
             />
           </div>
