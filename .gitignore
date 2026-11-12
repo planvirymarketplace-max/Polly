@@ -52,3 +52,15 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# sandbox / runtime artifacts (not part of the Polly source)
+/db/
+/.zscripts/
+/tool-results/
+/upload/
+/download/
+/tests/
+/examples/
+/mini-services/
+Caddyfile
+*.pid
