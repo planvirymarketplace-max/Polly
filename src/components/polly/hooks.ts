@@ -26,6 +26,7 @@ export interface SponsorPollRow {
   topic: { label: string; emoji: string | null } | null;
   samplingMode: string;
   modeLabel: string;
+  creatorHandle: string | null;
   status: string;
   estimatedN: number;
   actualN: number;

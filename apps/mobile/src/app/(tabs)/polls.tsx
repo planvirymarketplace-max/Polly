@@ -20,12 +20,14 @@ const SPONSOR_EMOJI: Record<string, string> = {
   RESEARCH: "🔬",
   BRAND: "🛒",
   ADVOCACY: "🏛️",
+  CREATOR: "🎙️",
 };
 const MODE_LABEL: Record<string, string> = {
   QUOTA_UGC: "Quota + UGC",
   UGC_MATCH: "UGC Match",
   RANDOM: "Random Draw",
   SPONSOR_SEGMENT: "Sponsor Segment",
+  CREATOR: "Creator Audience",
 };
 
 function ResultsBars({ results, myOptionId }: { results: PollResults; myOptionId?: string }) {

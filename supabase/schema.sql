@@ -33,6 +33,7 @@ create table if not exists users (
   "followerCount"       integer not null default 0,
   "pollsAnswered"       integer not null default 0,
   "commentsPosted"      integer not null default 0,
+  "isCreator"           boolean not null default false, -- runs a creator channel; can receive CREATOR-mode polls
   "createdAt"           timestamptz not null default now(),
   "updatedAt"           timestamptz not null default now()
 );
@@ -50,6 +51,14 @@ create table if not exists "user_interests" (
   affinity double precision not null, -- 0-1 strength inferred from UGC engagement
   primary key ("userId", "topicId")
 );
+
+create table if not exists follows (
+  "followerId" text not null references users (id) on delete cascade,
+  "followeeId" text not null references users (id) on delete cascade,
+  "createdAt"  timestamptz not null default now(),
+  primary key ("followerId", "followeeId")
+);
+create index if not exists follows_followee_id_idx on follows ("followeeId");
 
 create table if not exists happenings (
   id             text primary key,
@@ -80,7 +89,7 @@ create table if not exists sponsors (
   id                text primary key,
   "ownerSupabaseId" text, -- Supabase auth.users id of the sponsor account
   name              text not null,
-  kind              text not null, -- STATION | NONPROFIT | RESEARCH | BRAND | ADVOCACY
+  kind              text not null, -- STATION | NONPROFIT | RESEARCH | BRAND | ADVOCACY | CREATOR
   blurb             text
 );
 create index if not exists sponsors_owner_supabase_id_idx on sponsors ("ownerSupabaseId");
@@ -92,7 +101,8 @@ create table if not exists polls (
   context                   text, -- why the sponsor is asking
   "topicId"                 text references topics (id),
   kind                      text not null default 'SINGLE_CHOICE', -- SINGLE_CHOICE | LIKERT
-  "samplingMode"            text not null, -- QUOTA_UGC | UGC_MATCH | RANDOM | SPONSOR_SEGMENT
+  "samplingMode"            text not null, -- QUOTA_UGC | UGC_MATCH | RANDOM | SPONSOR_SEGMENT | CREATOR
+  "creatorId"               text references users (id), -- CREATOR mode: the channel delivering this poll
   "targetMetros"            text not null default 'NATIONAL', -- JSON array or "NATIONAL"
   "rewardPoints"            integer not null default 50,
   "estimatedN"              integer not null default 500,

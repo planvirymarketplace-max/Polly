@@ -4,7 +4,12 @@
 // and is imported by both apps/web (Next.js) and apps/mobile (Expo).
 // ─────────────────────────────────────────────────────────────
 
-export type SamplingMode = "QUOTA_UGC" | "UGC_MATCH" | "RANDOM" | "SPONSOR_SEGMENT";
+export type SamplingMode =
+  | "QUOTA_UGC"
+  | "UGC_MATCH"
+  | "RANDOM"
+  | "SPONSOR_SEGMENT"
+  | "CREATOR";
 
 export type Tier = "HATCHLING" | "VOICED" | "WEATHERED" | "FLOCK_LEADER";
 
@@ -60,6 +65,8 @@ export interface PollCardDTO {
   closesAt: string;
   estimatedN: number;
   sponsor: { name: string; kind: string };
+  // CREATOR mode: the channel the poll was delivered through
+  creator: { handle: string; displayName: string } | null;
   topic: TopicDTO | null;
   options: { id: string; label: string }[];
   alreadyResponded: boolean;

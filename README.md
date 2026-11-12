@@ -26,7 +26,7 @@ polly/
 │   └── lib/polly/          # core engines (mirrored to packages/core)
 ├── packages/core/          # @polly/core — shared domain logic for web + mobile
 │   └── src/
-│       ├── sampling.ts     # the business: 4 selection modes + post-stratification weighting
+│       ├── sampling.ts     # the business: 5 selection modes + post-stratification weighting
 │       ├── rewards.ts      # tiered rewards: points, sweepstakes, rev share, perks
 │       ├── pricing.ts      # sponsor price estimator vs traditional polling
 │       └── types.ts        # DTOs shared across platforms
@@ -74,6 +74,7 @@ Set `extra.apiUrl` in `app.json` to your deployed web app (Lightsail host or tun
 | **UGC Match** | Pure topical match. Fast, passionate, skews loud — for engagement reads, not front-page numbers. | $1.00 |
 | **Random Draw** | Uniform probability. Methodological benchmark, zero targeting. | $1.20 |
 | **Sponsor Segment** | Sponsor defines geography × topic × demographics. Polly fills the order. | $2.25 |
+| **Creator Audience** | The poll runs through a creator's channel to their followers — highest completion rates in the app. The creator takes revenue share on every complete. | $3.00 |
 
 Weighting: each response carries `weight = census_target_share / sample_share` (rim-capped
 0.25–4.0). Raw vs weighted percentages are shown side-by-side everywhere — users see the
@@ -100,7 +101,7 @@ Guests accrue **held** points — claimable the moment they create an account.
 The Prisma schema maps directly to Postgres:
 
 1. Create a Supabase project; run the SQL equivalent of `prisma/schema.prisma`
-   (tables: `User`, `Topic`, `UserInterest`, `Happening`, `Comment`, `Sponsor`,
+   (tables: `User`, `Topic`, `UserInterest`, `Follow`, `Happening`, `Comment`, `Sponsor`,
    `Poll`, `PollOption`, `PollResponse`, `RewardTransaction`).
 2. Auth: enable Apple, Google, phone OTP (Twilio via Supabase), magic link —
    the auth screen already presents all of them; replace the demo session
@@ -136,7 +137,8 @@ Google accounts need the 14-day closed-test window before production.
 
 MVP build on branch `mvp-deploy` (see `MVP_HANDOVER.md`): Supabase Auth + Postgres
 via Prisma, real RSS ingestion (no fictional seed — `scripts/seed.ts` seeds only
-the 9-topic taxonomy), sponsor-only polls with all four sampling modes, voting
+the 9-topic taxonomy), sponsor-only polls with all five sampling modes
+(including Creator Audience via the follow graph), voting
 with live post-stratification weighting, quota fill visualization, tiered
 rewards with guest held-points + claim on signup, and a sponsor dashboard that
 launches polls into the live member app instantly. **Not yet deployed** — it

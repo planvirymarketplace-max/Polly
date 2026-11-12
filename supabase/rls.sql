@@ -31,6 +31,7 @@ alter table polls enable row level security;
 alter table poll_options enable row level security;
 alter table poll_responses enable row level security;
 alter table reward_transactions enable row level security;
+alter table follows enable row level security;
 
 -- ── users: members read/update only their own row ────────────────
 drop policy if exists "Members read own user row" on users;
@@ -175,3 +176,21 @@ create policy "Members read own transactions" on reward_transactions
   ));
 -- No INSERT/UPDATE/DELETE policy: transactions are written only by the
 -- server (Prisma), never by direct client access.
+
+-- ── follows: public read (follow graph powers "via @handle" badges
+-- and the CREATOR audience); members manage only their own edges ───
+drop policy if exists "Anyone reads follows" on follows;
+create policy "Anyone reads follows" on follows
+  for select to anon, authenticated using (true);
+
+drop policy if exists "Members manage own follows" on follows;
+create policy "Members manage own follows" on follows
+  for all to authenticated
+  using (exists (
+    select 1 from users u
+    where u.id = follows."followerId" and u."supabaseId" = auth.uid()::text
+  ))
+  with check (exists (
+    select 1 from users u
+    where u.id = follows."followerId" and u."supabaseId" = auth.uid()::text
+  ));
